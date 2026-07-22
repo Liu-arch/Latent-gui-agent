@@ -19,6 +19,9 @@ loss/
 checkpoints/
 wandb/
 runs/
+environment_snapshots/
+environment_snapshot_*/
+*.environment-snapshot.tar.gz
 
 *.pt
 *.pth
@@ -36,4 +39,3 @@ runs/
 *.zip
 *.tar
 *.gz
-

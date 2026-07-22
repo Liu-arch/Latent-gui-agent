@@ -36,6 +36,33 @@ pip install -e .
 
 The checked-in DDP runtime currently uses the standard PyTorch CUDA/NCCL interface. A PPU environment works without code changes only when its vendor runtime exposes a CUDA-compatible PyTorch device. For a native PPU device/backend, set up the vendor PyTorch extension first and adapt `qwen3_gui_agent/distributed_training.py` to its device name and collective backend.
 
+### Export the source cluster environment
+
+Do not migrate with `pip freeze` alone: it contains source-machine CUDA and compiled packages. Export both a forensic snapshot and an accelerator-neutral lock instead:
+
+```bash
+conda activate qwen3_agentnet
+bash scripts/export_cluster_environment.sh /path/to/agentnet_environment_snapshot
+```
+
+The snapshot contains full pip/conda records, runtime and GPU metadata, and `requirements.portable.txt`. The portable file intentionally removes PyTorch, CUDA/NVIDIA packages, Triton, vLLM, FlashAttention, and local editable paths.
+
+On the PPU machine, create a Python 3.10 environment and install the PPU vendor's PyTorch runtime first. Then restore the accelerator-neutral packages:
+
+```bash
+git clone https://github.com/Liu-arch/Latent-gui-agent.git
+cd Latent-gui-agent
+bash scripts/restore_ppu_environment.sh /path/to/agentnet_environment_snapshot
+```
+
+The default `RESTORE_MODE=project` uses the compatible ranges in `requirements.txt`. After that works, use `RESTORE_MODE=locked` only when you need the exact accelerator-neutral versions from the source cluster:
+
+```bash
+RESTORE_MODE=locked bash scripts/restore_ppu_environment.sh /path/to/agentnet_environment_snapshot
+```
+
+Compare `runtime-info.json` from the source cluster with `runtime-info.ppu.json` before training. Keep the full snapshot outside this public repository because it can contain internal package indexes and filesystem paths.
+
 ## Expected Data
 
 Each line is one ordered trajectory step. The trainer consumes these principal fields:
