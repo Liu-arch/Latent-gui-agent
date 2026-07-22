@@ -117,6 +117,21 @@ Compare `environment/cluster_qwen3_agentnet/runtime-info.public.json` with `envi
 
 ## Expected Data
 
+Download the official AgentNet Ubuntu subset into persistent PPU storage with:
+
+```bash
+python scripts/download_agentnet_ubuntu.py \
+  --target /workspace/storage/datasets/AgentNet \
+  --extract
+```
+
+The downloader pins the verified dataset revision, resumes partial Hugging Face
+downloads, validates every split archive by exact byte size, and writes
+`.agentnet_ubuntu_download.done.json` and
+`.agentnet_ubuntu_extract.done.json` below the target directory.
+Keep enough free space for both the 68.7 GiB split archives and extracted
+screenshots.
+
 Each line is one ordered trajectory step. The trainer consumes these principal fields:
 
 ```json
