@@ -27,6 +27,7 @@ else
     --shm-size "${SHM_SIZE}" \
     --env "CUDA_VISIBLE_DEVICES=${PPU_VISIBLE_DEVICES}" \
     --env TOKENIZERS_PARALLELISM=false \
+    --env LARA_ATTN_IMPLEMENTATION=eager \
     --env HF_HOME=/workspace/storage/cache/huggingface \
     --volume "${ROOT_DIR}:/workspace/Latent-gui-agent" \
     --volume "${STORAGE_DIR}:/workspace/storage" \

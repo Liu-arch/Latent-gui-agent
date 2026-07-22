@@ -367,7 +367,7 @@ class LaRAStyleQwen3VLAgent(nn.Module):
         *,
         device_map: str | dict[str, Any] | None = None,
         torch_dtype: str | torch.dtype | None = None,
-        attn_implementation: str = "sdpa",
+        attn_implementation: str | None = None,
         latent_slot_count: int = 8,
         pixel_prune_threshold: float = 0.0,
         pixel_prune_predictor_order: str = "pred2d,left,up",
@@ -403,8 +403,12 @@ class LaRAStyleQwen3VLAgent(nn.Module):
             load_kwargs["device_map"] = device_map
         if torch_dtype is not None:
             load_kwargs["dtype"] = torch_dtype
-        if attn_implementation:
-            load_kwargs["attn_implementation"] = attn_implementation
+        resolved_attn_implementation = (
+            attn_implementation
+            or os.environ.get("LARA_ATTN_IMPLEMENTATION", "sdpa")
+        ).strip()
+        if resolved_attn_implementation:
+            load_kwargs["attn_implementation"] = resolved_attn_implementation
         model = Qwen3VLForConditionalGeneration.from_pretrained(model_name_or_path, **load_kwargs)
         processor_kwargs: dict[str, Any] = {}
         if image_min_pixels and int(image_min_pixels) > 0:

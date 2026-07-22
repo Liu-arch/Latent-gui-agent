@@ -83,6 +83,18 @@ sudo env PPU_VISIBLE_DEVICES=0,1 \
 sudo docker exec -it latent-gui-agent-dev bash
 ```
 
+The SDK 1.6.1 SDPA kernel expects a different attention tensor layout from
+Transformers 4.57.1. The PPU launchers therefore set
+`LARA_ATTN_IMPLEMENTATION=eager`; CUDA/A800 runs remain on the default `sdpa`
+path when that environment variable is absent. Validate a downloaded model
+with a real visual generation before training:
+
+```bash
+python scripts/smoke_test_qwen3vl_model.py \
+  --model /workspace/storage/models/qwen3-vl-8b \
+  --agent-wrapper
+```
+
 The verified package set is in `requirements-ppu.txt`. In particular, it pins
 `transformers==4.57.1` for Qwen3-VL support and `numpy==1.25.2` to remain
 compatible with the SDK image's vLLM 0.7.3 and SciPy 1.9.3. Do not install a

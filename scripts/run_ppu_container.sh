@@ -22,6 +22,7 @@ docker run --rm "${TTY_ARGS[@]}" \
   --shm-size "${SHM_SIZE}" \
   --env "CUDA_VISIBLE_DEVICES=${PPU_VISIBLE_DEVICES}" \
   --env TOKENIZERS_PARALLELISM=false \
+  --env LARA_ATTN_IMPLEMENTATION=eager \
   --volume "${ROOT_DIR}:/workspace/Latent-gui-agent" \
   --workdir /workspace/Latent-gui-agent \
   "${IMAGE_TAG}" \
