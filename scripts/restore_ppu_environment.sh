@@ -24,11 +24,14 @@ case "${RESTORE_MODE}" in
   project)
     python -m pip install -r "${ROOT_DIR}/requirements.txt"
     ;;
+  ppu)
+    python -m pip install -r "${ROOT_DIR}/requirements-ppu.txt"
+    ;;
   locked)
     python -m pip install -r "${SNAPSHOT_DIR}/requirements.portable.txt"
     ;;
   *)
-    echo "RESTORE_MODE must be 'project' or 'locked', got: ${RESTORE_MODE}" >&2
+    echo "RESTORE_MODE must be 'project', 'ppu', or 'locked', got: ${RESTORE_MODE}" >&2
     exit 2
     ;;
 esac

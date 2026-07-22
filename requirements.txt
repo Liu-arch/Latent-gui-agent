@@ -1,14 +1,14 @@
 # Install the accelerator vendor's compatible PyTorch build first.
-transformers>=4.57.0
-accelerate>=1.7.0
-peft>=0.17.1
-qwen-vl-utils>=0.0.14
-safetensors>=0.4.3
-numpy>=1.26,<2.1
-Pillow>=10.0.0
-einops>=0.8.0
-sentencepiece>=0.2.0
-tiktoken>=0.7.0
-tqdm>=4.66.0
-matplotlib>=3.8.0
-
+# Keep Transformers below 5: this code relies on the 4.57 Qwen3-VL API.
+transformers==4.57.1
+accelerate==1.10.1
+peft==0.17.1
+qwen-vl-utils==0.0.14
+safetensors==0.6.2
+numpy>=1.25,<2.0
+Pillow>=10.0,<12.0
+einops==0.8.2
+sentencepiece==0.2.2
+tiktoken>=0.7,<0.12
+tqdm>=4.66,<4.68
+matplotlib>=3.8,<3.9

@@ -55,6 +55,46 @@ cd Latent-gui-agent
 bash scripts/restore_ppu_environment.sh
 ```
 
+For the Alibaba PPU-ZW810E host, the tested path is the cached SDK 1.6.1
+container. It preserves the vendor's PyTorch 2.6.0 build and installs only
+Python-level project dependencies:
+
+```bash
+sudo env IMAGE_TAG=latent-gui-agent:ppu-sdk1.6.1 \
+  bash scripts/build_ppu_image.sh
+
+sudo env PPU_VISIBLE_DEVICES=0 \
+  bash scripts/run_ppu_container.sh bash scripts/smoke_test_ppu.sh
+
+sudo env PPU_VISIBLE_DEVICES=0,1 \
+  bash scripts/run_ppu_container.sh \
+  env PPU_WORLD_SIZE=2 bash scripts/smoke_test_ppu_ddp.sh
+```
+
+Start a persistent development container after the checks pass. The container
+itself sleeps without allocating PPU memory, while model/data/checkpoint files
+live on the large `/data2` filesystem:
+
+```bash
+sudo env PPU_VISIBLE_DEVICES=0,1 \
+  STORAGE_DIR=/data2/liuenqi/latent_gui_agent \
+  bash scripts/start_ppu_dev_container.sh
+
+sudo docker exec -it latent-gui-agent-dev bash
+```
+
+The verified package set is in `requirements-ppu.txt`. In particular, it pins
+`transformers==4.57.1` for Qwen3-VL support and `numpy==1.25.2` to remain
+compatible with the SDK image's vLLM 0.7.3 and SciPy 1.9.3. Do not install a
+PyPI CUDA `torch` wheel into this image.
+
+If a vendor Python environment already exists outside Docker, use the same
+locked package set after confirming that its PyTorch can see the PPU:
+
+```bash
+RESTORE_MODE=ppu bash scripts/restore_ppu_environment.sh
+```
+
 The repository includes a sanitized source-environment manifest under `environment/cluster_qwen3_agentnet`. The default `RESTORE_MODE=project` uses the compatible ranges in `requirements.txt`. After that works, use `RESTORE_MODE=locked` to reproduce the source cluster's core package versions:
 
 ```bash
