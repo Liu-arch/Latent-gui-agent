@@ -11,7 +11,9 @@ ACCELERATOR_PACKAGES = {
     "bitsandbytes",
     "deepspeed",
     "flash-attn",
+    "flashinfer-python",
     "intel-extension-for-pytorch",
+    "pynvml",
     "pytorch-triton",
     "torch",
     "torch-mlu",
@@ -83,7 +85,7 @@ def main() -> None:
     header = [
         "# Generated from the source environment by make_portable_requirements.py.",
         "# Install the target accelerator vendor's PyTorch build before this file.",
-        "# CUDA/NVIDIA/torch/vLLM/compiled-extension packages are intentionally omitted.",
+        "# Known accelerator-bound packages such as CUDA, torch, vLLM, and FlashInfer are omitted.",
         "",
     ]
     args.output.parent.mkdir(parents=True, exist_ok=True)

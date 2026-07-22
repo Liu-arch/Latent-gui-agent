@@ -52,16 +52,16 @@ On the PPU machine, create a Python 3.10 environment and install the PPU vendor'
 ```bash
 git clone https://github.com/Liu-arch/Latent-gui-agent.git
 cd Latent-gui-agent
-bash scripts/restore_ppu_environment.sh /path/to/agentnet_environment_snapshot
+bash scripts/restore_ppu_environment.sh
 ```
 
-The default `RESTORE_MODE=project` uses the compatible ranges in `requirements.txt`. After that works, use `RESTORE_MODE=locked` only when you need the exact accelerator-neutral versions from the source cluster:
+The repository includes a sanitized source-environment manifest under `environment/cluster_qwen3_agentnet`. The default `RESTORE_MODE=project` uses the compatible ranges in `requirements.txt`. After that works, use `RESTORE_MODE=locked` to reproduce the source cluster's core package versions:
 
 ```bash
-RESTORE_MODE=locked bash scripts/restore_ppu_environment.sh /path/to/agentnet_environment_snapshot
+RESTORE_MODE=locked bash scripts/restore_ppu_environment.sh
 ```
 
-Compare `runtime-info.json` from the source cluster with `runtime-info.ppu.json` before training. Keep the full snapshot outside this public repository because it can contain internal package indexes and filesystem paths.
+Compare `environment/cluster_qwen3_agentnet/runtime-info.public.json` with `environment_snapshots/runtime-info.ppu.json` before training. The full tar snapshot remains private because it contains hostnames, internal filesystem paths, and the entire unrelated package inventory.
 
 ## Expected Data
 

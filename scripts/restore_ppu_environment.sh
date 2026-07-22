@@ -2,13 +2,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SNAPSHOT_DIR="${1:-}"
+SNAPSHOT_DIR="${1:-${ROOT_DIR}/environment/cluster_qwen3_agentnet}"
 RESTORE_MODE="${RESTORE_MODE:-project}"
-
-if [[ -z "${SNAPSHOT_DIR}" ]]; then
-  echo "Usage: bash scripts/restore_ppu_environment.sh /path/to/environment_snapshot" >&2
-  exit 2
-fi
+PPU_RUNTIME_INFO="${PPU_RUNTIME_INFO:-${ROOT_DIR}/environment_snapshots/runtime-info.ppu.json}"
 
 if [[ ! -f "${SNAPSHOT_DIR}/requirements.portable.txt" ]]; then
   echo "Missing ${SNAPSHOT_DIR}/requirements.portable.txt" >&2
@@ -38,8 +34,10 @@ case "${RESTORE_MODE}" in
 esac
 python -m pip install -e "${ROOT_DIR}"
 python -m pip check
+mkdir -p "$(dirname "${PPU_RUNTIME_INFO}")"
 python "${ROOT_DIR}/scripts/collect_runtime_info.py" \
-  --output "${SNAPSHOT_DIR}/runtime-info.ppu.json"
+  --output "${PPU_RUNTIME_INFO}"
 
 echo "[ppu-restore] environment restore complete"
-echo "[ppu-restore] compare runtime-info.json with runtime-info.ppu.json"
+echo "[ppu-restore] PPU runtime info=${PPU_RUNTIME_INFO}"
+echo "[ppu-restore] compare it with ${SNAPSHOT_DIR}/runtime-info.public.json"

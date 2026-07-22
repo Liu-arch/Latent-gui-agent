@@ -10,6 +10,8 @@ def test_filter_requirements_removes_accelerator_and_local_packages() -> None:
         "nvidia-cublas-cu12==12.6.4.1",
         "triton==3.3.0",
         "flash-attn==2.7.4",
+        "flashinfer-python==0.6.3",
+        "pynvml==12.0.0",
         "transformers==4.57.1",
         "numpy==2.0.2",
         "local-project @ file:///workspace/local-project",

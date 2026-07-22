@@ -1,0 +1,36 @@
+{
+  "source_platform": {
+    "system": "Linux",
+    "machine": "x86_64",
+    "python": "3.10.18"
+  },
+  "source_accelerator_reference_only": {
+    "torch": "2.9.1+cu128",
+    "cuda_build": "12.8",
+    "distributed_backends": {
+      "nccl": true,
+      "gloo": true,
+      "mpi": false,
+      "ucc": false
+    }
+  },
+  "core_packages": {
+    "transformers": "4.57.6",
+    "accelerate": "1.13.0",
+    "peft": "0.19.1",
+    "qwen-vl-utils": "0.0.14",
+    "safetensors": "0.6.2",
+    "numpy_source_observed": "2.2.6",
+    "numpy_portable_constraint": ">=1.26,<2.1",
+    "Pillow": "11.3.0",
+    "einops": "0.8.1",
+    "sentencepiece": "0.2.1",
+    "tiktoken": "0.11.0",
+    "tqdm": "4.67.1"
+  },
+  "notes": [
+    "The source CUDA torch build is recorded only for comparison and must not be installed on PPU.",
+    "Hostnames, usernames, environment paths, private channels, and full package inventories were removed.",
+    "Install the PPU vendor runtime before restoring Python packages."
+  ]
+}
