@@ -7,6 +7,12 @@ CONTAINER_NAME="${CONTAINER_NAME:-latent-gui-agent-dev}"
 PPU_VISIBLE_DEVICES="${PPU_VISIBLE_DEVICES:-0,1}"
 STORAGE_DIR="${STORAGE_DIR:-/data2/liuenqi/latent_gui_agent}"
 SHM_SIZE="${SHM_SIZE:-64g}"
+HF_XET_HOST_IP="${HF_XET_HOST_IP:-}"
+
+HOST_ARGS=()
+if [[ -n "${HF_XET_HOST_IP}" ]]; then
+  HOST_ARGS=(--add-host "cas-bridge.xethub.hf.co:${HF_XET_HOST_IP}")
+fi
 
 if [[ ! -d "${STORAGE_DIR}" ]]; then
   echo "Storage directory does not exist: ${STORAGE_DIR}" >&2
@@ -24,6 +30,7 @@ else
     --privileged \
     --ipc=host \
     --network=host \
+    "${HOST_ARGS[@]}" \
     --shm-size "${SHM_SIZE}" \
     --env "CUDA_VISIBLE_DEVICES=${PPU_VISIBLE_DEVICES}" \
     --env TOKENIZERS_PARALLELISM=false \

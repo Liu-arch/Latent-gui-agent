@@ -5,6 +5,12 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE_TAG="${IMAGE_TAG:-latent-gui-agent:ppu-sdk1.6.1}"
 PPU_VISIBLE_DEVICES="${PPU_VISIBLE_DEVICES:-0}"
 SHM_SIZE="${SHM_SIZE:-64g}"
+HF_XET_HOST_IP="${HF_XET_HOST_IP:-}"
+
+HOST_ARGS=()
+if [[ -n "${HF_XET_HOST_IP}" ]]; then
+  HOST_ARGS=(--add-host "cas-bridge.xethub.hf.co:${HF_XET_HOST_IP}")
+fi
 
 if [[ $# -eq 0 ]]; then
   set -- bash
@@ -19,6 +25,7 @@ docker run --rm "${TTY_ARGS[@]}" \
   --privileged \
   --ipc=host \
   --network=host \
+  "${HOST_ARGS[@]}" \
   --shm-size "${SHM_SIZE}" \
   --env "CUDA_VISIBLE_DEVICES=${PPU_VISIBLE_DEVICES}" \
   --env TOKENIZERS_PARALLELISM=false \

@@ -125,6 +125,11 @@ python scripts/download_agentnet_ubuntu.py \
   --extract
 ```
 
+If the PPU node cannot resolve `cas-bridge.xethub.hf.co`, resolve it on a
+machine with working DNS and recreate the development container with
+`HF_XET_HOST_IP=<resolved-ip>`. The PPU launch scripts then add the scoped
+Docker host mapping automatically.
+
 The downloader pins the verified dataset revision, resumes partial Hugging Face
 downloads, validates every split archive by exact byte size, and writes
 `.agentnet_ubuntu_download.done.json` and
