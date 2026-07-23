@@ -305,6 +305,10 @@ def _parse_action_code(code: str) -> dict[str, Any] | None:
         amount = args.get("_positional_0") or args.get("clicks") or args.get("amount")
         return {"type": "scroll", "amount": _maybe_int(amount)}
 
+    wait_match = re.search(r"(?:computer|pyautogui)\.(?:wait|sleep)\s*\((.*?)\)", code, flags=re.I)
+    if wait_match:
+        return {"type": "wait", "status": "success"}
+
     terminate_match = re.search(r"computer\.terminate\s*\((.*?)\)", code, flags=re.I)
     if terminate_match:
         args = _parse_named_args(terminate_match.group(1))
