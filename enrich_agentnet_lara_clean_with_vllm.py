@@ -214,15 +214,14 @@ def validate_refined_fields(payload: dict[str, Any]) -> dict[str, str]:
     bad = [key for key, value in fields.items() if forbidden.search(value)]
     if bad:
         raise ValueError(f"Forbidden coordinate/action syntax in refined fields: {bad}")
-    overlong = {
-        key: len(value.split())
-        for key, value in fields.items()
-        if len(value.split()) > FIELD_WORD_LIMITS[key]
-    }
-    if overlong:
-        raise ValueError(
-            f"Refined fields exceed hard word limits: {overlong}; limits={FIELD_WORD_LIMITS}"
-        )
+    # Temperature-zero models can deterministically exceed a limit by one word,
+    # so retrying the identical request never resolves that row. Keep semantic
+    # validation strict, but enforce length deterministically at the boundary.
+    for key, value in fields.items():
+        words = value.split()
+        limit = FIELD_WORD_LIMITS[key]
+        if len(words) > limit:
+            fields[key] = " ".join(words[:limit]).rstrip(" ,;:")
     return fields
 
 
@@ -269,7 +268,13 @@ def enrich_once(
         request["response_format"] = {"type": "json_object"}
     response = get_client(args).chat.completions.create(**request)
     raw_text = response.choices[0].message.content or ""
-    refined = validate_refined_fields(extract_json_object(raw_text))
+    raw_payload = extract_json_object(raw_text)
+    trimmed_fields = [
+        key
+        for key, limit in FIELD_WORD_LIMITS.items()
+        if len(compact_text(raw_payload.get(key)).split()) > limit
+    ]
+    refined = validate_refined_fields(raw_payload)
 
     output = dict(row)
     output["schema_version"] = SCHEMA_VERSION
@@ -280,6 +285,7 @@ def enrich_once(
     output["enrich_status"] = "ok"
     output["enrich_error"] = None
     output["enrich_raw_response_text"] = raw_text
+    output["enrich_word_limit_trimmed_fields"] = trimmed_fields
 
     img_next = list(output.get("img_next") or [])
     explicit_reasoning = "\n".join(

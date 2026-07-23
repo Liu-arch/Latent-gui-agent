@@ -17,6 +17,19 @@ def write_jsonl(path: Path, rows: list[dict]) -> None:
     )
 
 
+def test_overlong_refined_fields_are_trimmed_deterministically() -> None:
+    from enrich_agentnet_lara_clean_with_vllm import FIELD_WORD_LIMITS, validate_refined_fields
+
+    payload = {
+        "actual_task": "one two three four five six seven eight nine ten eleven twelve thirteen",
+        "thought": "Choose the visible target because it directly advances this exact GUI task now.",
+        "reflection": "The expected panel opened successfully.",
+    }
+    refined = validate_refined_fields(payload)
+    assert len(refined["actual_task"].split()) == FIELD_WORD_LIMITS["actual_task"]
+    assert len(refined["thought"].split()) <= FIELD_WORD_LIMITS["thought"]
+
+
 def test_fixed_subset_selection_and_merge(tmp_path: Path) -> None:
     dataset_root = tmp_path / "dataset"
     image_root = dataset_root / "ubuntu_images"
