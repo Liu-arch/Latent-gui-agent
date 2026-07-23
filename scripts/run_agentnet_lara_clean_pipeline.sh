@@ -8,7 +8,11 @@ BASE_URL="${BASE_URL:-http://127.0.0.1:18000/v1}"
 MODEL_NAME="${MODEL_NAME:-qwen3-vl-8b}"
 CONCURRENCY="${CONCURRENCY:-4}"
 SMOKE_SAMPLES="${SMOKE_SAMPLES:-100}"
-MAX_NEW_TOKENS="${MAX_NEW_TOKENS:-192}"
+MAX_NEW_TOKENS="${MAX_NEW_TOKENS:-384}"
+REQUEST_TIMEOUT="${REQUEST_TIMEOUT:-300}"
+REQUEST_RETRIES="${REQUEST_RETRIES:-5}"
+PIPELINE_RETRIES="${PIPELINE_RETRIES:-12}"
+PIPELINE_RETRY_SLEEP="${PIPELINE_RETRY_SLEEP:-10}"
 
 RAW_JSONL="${RAW_ROOT}/agentnet_ubuntu_5k.jsonl"
 STRUCTURAL_DIR="${OUTPUT_ROOT}/structural"
@@ -32,6 +36,33 @@ echo "[agentnet-clean] raw=${RAW_JSONL}"
 echo "[agentnet-clean] output_root=${OUTPUT_ROOT}"
 echo "[agentnet-clean] base_url=${BASE_URL}"
 echo "[agentnet-clean] concurrency=${CONCURRENCY}"
+echo "[agentnet-clean] request_retries=${REQUEST_RETRIES} pipeline_retries=${PIPELINE_RETRIES}"
+
+run_enrichment_with_resume() {
+  local label="$1"
+  local log_file="$2"
+  shift 2
+  local attempt=1
+
+  while true; do
+    echo "[agentnet-clean] ${label} enrichment attempt ${attempt}/${PIPELINE_RETRIES}"
+    if python "${CODE_DIR}/enrich_agentnet_lara_clean_with_vllm.py" \
+      "$@" \
+      --request-timeout "${REQUEST_TIMEOUT}" \
+      --max-retries "${REQUEST_RETRIES}" \
+      --resume \
+      2>&1 | tee -a "${log_file}"; then
+      return 0
+    fi
+    if (( attempt >= PIPELINE_RETRIES )); then
+      echo "[agentnet-clean] ${label} enrichment exhausted ${PIPELINE_RETRIES} attempts" >&2
+      return 1
+    fi
+    attempt=$((attempt + 1))
+    echo "[agentnet-clean] ${label} failed; retrying in ${PIPELINE_RETRY_SLEEP}s"
+    sleep "${PIPELINE_RETRY_SLEEP}"
+  done
+}
 
 if [[ ! -s "${RAW_JSONL}" ]]; then
   echo "Missing official AgentNet JSONL: ${RAW_JSONL}" >&2
@@ -71,7 +102,7 @@ fi
 
 SMOKE_ENRICHED="${SMOKE_DIR}/enriched.jsonl"
 echo "[agentnet-clean] running/resuming ${SMOKE_SAMPLES}-row smoke enrichment"
-python "${CODE_DIR}/enrich_agentnet_lara_clean_with_vllm.py" \
+run_enrichment_with_resume "smoke" "${LOG_DIR}/enrich_smoke.log" \
   --steps "${STRUCTURAL_JSONL}" \
   --dataset-root "${RAW_ROOT}" \
   --base-url "${BASE_URL}" \
@@ -83,9 +114,7 @@ python "${CODE_DIR}/enrich_agentnet_lara_clean_with_vllm.py" \
   --concurrency "${CONCURRENCY}" \
   --max-new-tokens "${MAX_NEW_TOKENS}" \
   --save-every 20 \
-  --log-every 20 \
-  --resume \
-  2>&1 | tee -a "${LOG_DIR}/enrich_smoke.log"
+  --log-every 20
 
 python "${CODE_DIR}/finalize_agentnet_lara_clean.py" \
   --input "${SMOKE_ENRICHED}" \
@@ -120,7 +149,7 @@ with path.open("r", encoding="utf-8") as handle:
 PY
 
 echo "[agentnet-clean] smoke test passed; starting/resuming full enrichment"
-python "${CODE_DIR}/enrich_agentnet_lara_clean_with_vllm.py" \
+run_enrichment_with_resume "full" "${LOG_DIR}/enrich_full.log" \
   --steps "${STRUCTURAL_JSONL}" \
   --dataset-root "${RAW_ROOT}" \
   --base-url "${BASE_URL}" \
@@ -131,9 +160,7 @@ python "${CODE_DIR}/enrich_agentnet_lara_clean_with_vllm.py" \
   --concurrency "${CONCURRENCY}" \
   --max-new-tokens "${MAX_NEW_TOKENS}" \
   --save-every 20 \
-  --log-every 100 \
-  --resume \
-  2>&1 | tee -a "${LOG_DIR}/enrich_full.log"
+  --log-every 100
 
 echo "[agentnet-clean] validating and splitting full dataset"
 python "${CODE_DIR}/finalize_agentnet_lara_clean.py" \

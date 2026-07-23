@@ -21,6 +21,7 @@ except Exception:  # pragma: no cover
 
 SCHEMA_VERSION = "agentnet_lara_clean_enriched_v1"
 _CLIENT_LOCAL = threading.local()
+FIELD_WORD_LIMITS = {"actual_task": 12, "thought": 18, "reflection": 18}
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,9 +46,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--shard-count", type=int, default=0)
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--concurrency", type=int, default=4)
-    parser.add_argument("--max-new-tokens", type=int, default=192)
+    parser.add_argument("--max-new-tokens", type=int, default=384)
     parser.add_argument("--request-timeout", type=float, default=300.0)
     parser.add_argument("--max-retries", type=int, default=4)
+    parser.add_argument(
+        "--no-json-mode",
+        action="store_true",
+        help="Disable the OpenAI-compatible JSON response constraint.",
+    )
     parser.add_argument("--save-every", type=int, default=20)
     parser.add_argument("--log-every", type=int, default=20)
     return parser.parse_args()
@@ -121,7 +127,12 @@ def resolve_image(dataset_root: Path, image_name: str) -> Path:
     raise FileNotFoundError(f"Could not resolve image: {normalized}")
 
 
-def build_prompt(row: dict[str, Any]) -> str:
+def build_prompt(row: dict[str, Any], *, compact_retry: bool = False) -> str:
+    source_thought = str(row.get("thought_raw", "") or "").strip()
+    source_reflection = str(row.get("reflection_raw", "") or "").strip()
+    if compact_retry:
+        source_thought = "[omitted after an overlong or malformed response]"
+        source_reflection = "[omitted after an overlong or malformed response]"
     return "\n".join(
         [
             "You are creating compact supervision for one GUI-agent trajectory step.",
@@ -130,21 +141,29 @@ def build_prompt(row: dict[str, Any]) -> str:
             "Return one JSON object only with this exact schema:",
             '{"actual_task":"...","thought":"...","reflection":"..."}',
             "Requirements:",
-            "- actual_task: the concrete current GUI subtask, preferably no more than 12 words.",
-            "- thought: the essential reason for choosing this action, preferably no more than 18 words.",
-            "- reflection: the observed GUI change or action result, preferably no more than 18 words.",
+            "- actual_task: the concrete current GUI subtask, at most 12 words.",
+            "- thought: the essential reason for choosing this action, at most 18 words.",
+            "- reflection: the observed GUI change or action result, at most 18 words.",
+            "- The word limits are mandatory. Summarize; never copy long source passages.",
+            "- End immediately after the JSON object's closing brace.",
             "- Use the screenshots to correct unsupported or overly broad source text.",
             "- Preserve application names, menu labels, typed text, and completion status when relevant.",
             "- Do not include coordinates, point values, bounding boxes, bbox, action JSON, or code.",
             "- Do not shorten or rewrite the episode instruction; it is context only.",
             "- Do not invent UI elements or results not supported by the two screenshots.",
+            (
+                "- RETRY MODE: Return short phrases only; the previous response was "
+                "overlong or malformed."
+                if compact_retry
+                else "- Use concise phrases rather than copying source sentences."
+            ),
             "",
             f"episode_instruction: {str(row.get('instruction', '') or '').strip()}",
             f"episode_task_context: {str(row.get('episode_actual_task', '') or '').strip()}",
             f"current_step_seed: {str(row.get('actual_task_seed', '') or '').strip()}",
             f"source_action_description: {str(row.get('action_text_raw', '') or '').strip()}",
-            f"source_thought: {str(row.get('thought_raw', '') or '').strip()}",
-            f"source_reflection: {str(row.get('reflection_raw', '') or '').strip()}",
+            f"source_thought: {source_thought}",
+            f"source_reflection: {source_reflection}",
             f"source_action_code: {str(row.get('code', '') or '').strip()}",
         ]
     )
@@ -173,7 +192,8 @@ def extract_json_object(text: str) -> dict[str, Any]:
                 continue
             if isinstance(payload, dict):
                 return payload
-    raise ValueError("JSON object not found in model response")
+    preview = re.sub(r"\s+", " ", stripped)[:500]
+    raise ValueError(f"JSON object not found in model response; raw_preview={preview!r}")
 
 
 def compact_text(value: Any) -> str:
@@ -194,6 +214,15 @@ def validate_refined_fields(payload: dict[str, Any]) -> dict[str, str]:
     bad = [key for key, value in fields.items() if forbidden.search(value)]
     if bad:
         raise ValueError(f"Forbidden coordinate/action syntax in refined fields: {bad}")
+    overlong = {
+        key: len(value.split())
+        for key, value in fields.items()
+        if len(value.split()) > FIELD_WORD_LIMITS[key]
+    }
+    if overlong:
+        raise ValueError(
+            f"Refined fields exceed hard word limits: {overlong}; limits={FIELD_WORD_LIMITS}"
+        )
     return fields
 
 
@@ -215,21 +244,30 @@ def action_text(action: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def enrich_once(row: dict[str, Any], args: argparse.Namespace, dataset_root: Path) -> dict[str, Any]:
+def enrich_once(
+    row: dict[str, Any],
+    args: argparse.Namespace,
+    dataset_root: Path,
+    *,
+    retry_index: int = 0,
+) -> dict[str, Any]:
     before = resolve_image(dataset_root, str(row.get("before_screenshot", "")))
     after = resolve_image(dataset_root, str(row.get("after_screenshot", "")))
     content = [
         {"type": "image_url", "image_url": {"url": before.as_uri()}},
         {"type": "image_url", "image_url": {"url": after.as_uri()}},
-        {"type": "text", "text": build_prompt(row)},
+        {"type": "text", "text": build_prompt(row, compact_retry=retry_index > 0)},
     ]
-    response = get_client(args).chat.completions.create(
-        model=str(args.model),
-        messages=[{"role": "user", "content": content}],
-        temperature=0.0,
-        max_tokens=int(args.max_new_tokens),
-        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
-    )
+    request: dict[str, Any] = {
+        "model": str(args.model),
+        "messages": [{"role": "user", "content": content}],
+        "temperature": 0.0,
+        "max_tokens": int(args.max_new_tokens),
+        "extra_body": {"chat_template_kwargs": {"enable_thinking": False}},
+    }
+    if not bool(args.no_json_mode):
+        request["response_format"] = {"type": "json_object"}
+    response = get_client(args).chat.completions.create(**request)
     raw_text = response.choices[0].message.content or ""
     refined = validate_refined_fields(extract_json_object(raw_text))
 
@@ -277,7 +315,7 @@ def enrich_with_retries(
     last_error: Exception | None = None
     for attempt in range(max(0, int(args.max_retries)) + 1):
         try:
-            return enrich_once(row, args, dataset_root)
+            return enrich_once(row, args, dataset_root, retry_index=attempt)
         except Exception as exc:  # Network and format failures are retried together.
             last_error = exc
             if attempt < int(args.max_retries):
