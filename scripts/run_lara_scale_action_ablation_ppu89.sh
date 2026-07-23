@@ -62,7 +62,7 @@ train_and_eval() {
       --epochs 20 \
       --max-samples "${TRAIN_SAMPLES}" \
       --batch-size "${BATCH_SIZE}" \
-      --grad-accum-steps 1 \
+      --grad-accum-steps "${ACTION_GRAD_ACCUM_STEPS:-1}" \
       --history-n 5 \
       --image-max-pixels 589824 \
       --latent-slot-count 16 \

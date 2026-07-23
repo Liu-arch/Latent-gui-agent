@@ -39,12 +39,15 @@ REASONING_FIELD_SLOT_COUNTS="${REASONING_FIELD_SLOT_COUNTS:-6,5,5}"
 LORA_R="${LORA_R:-16}"
 LORA_ALPHA="${LORA_ALPHA:-32}"
 LORA_DROPOUT="${LORA_DROPOUT:-0.05}"
-# Training batch sizes are per DDP rank. Each GPU batches up to four active
-# trajectories so one multimodal forward amortizes the fixed model/vision
-# overhead. With two ranks every training stage has global batch 8.
+# Training batch sizes are per DDP rank. Gradient accumulation is configurable
+# independently so memory-constrained accelerators can preserve the intended
+# effective global batch without changing the optimization schedule.
 STAGE1_BATCH_SIZE="${STAGE1_BATCH_SIZE:-4}"
 STAGE2_BATCH_SIZE="${STAGE2_BATCH_SIZE:-4}"
 ACTION_BATCH_SIZE="${ACTION_BATCH_SIZE:-4}"
+STAGE1_GRAD_ACCUM_STEPS="${STAGE1_GRAD_ACCUM_STEPS:-1}"
+STAGE2_GRAD_ACCUM_STEPS="${STAGE2_GRAD_ACCUM_STEPS:-1}"
+ACTION_GRAD_ACCUM_STEPS="${ACTION_GRAD_ACCUM_STEPS:-1}"
 STAGE1_MAX_EPOCHS="${STAGE1_MAX_EPOCHS:-12}"
 STAGE2_TRANSITION_EPOCHS="${STAGE2_TRANSITION_EPOCHS:-4}"
 STAGE2_FULL_MAX_EPOCHS="${STAGE2_FULL_MAX_EPOCHS:-12}"
@@ -92,6 +95,8 @@ echo "[lara_clean_s100] training=torchrun_ddp world_size=${TRAIN_WORLD_SIZE} tra
 echo "[lara_clean_s100] evaluation=model_parallel eval_device_map=${EVAL_DEVICE_MAP}"
 echo "[lara_clean_s100] per_rank_batches stage1=${STAGE1_BATCH_SIZE} stage2=${STAGE2_BATCH_SIZE} action=${ACTION_BATCH_SIZE}"
 echo "[lara_clean_s100] global_batches stage1=$((TRAIN_WORLD_SIZE * STAGE1_BATCH_SIZE)) stage2=$((TRAIN_WORLD_SIZE * STAGE2_BATCH_SIZE)) action=$((TRAIN_WORLD_SIZE * ACTION_BATCH_SIZE))"
+echo "[lara_clean_s100] grad_accum stage1=${STAGE1_GRAD_ACCUM_STEPS} stage2=${STAGE2_GRAD_ACCUM_STEPS} action=${ACTION_GRAD_ACCUM_STEPS}"
+echo "[lara_clean_s100] effective_batches stage1=$((TRAIN_WORLD_SIZE * STAGE1_BATCH_SIZE * STAGE1_GRAD_ACCUM_STEPS)) stage2=$((TRAIN_WORLD_SIZE * STAGE2_BATCH_SIZE * STAGE2_GRAD_ACCUM_STEPS)) action=$((TRAIN_WORLD_SIZE * ACTION_BATCH_SIZE * ACTION_GRAD_ACCUM_STEPS))"
 echo "[lara_clean_s100] train_samples=${TRAIN_SAMPLES} train_eval_samples=${TRAIN_EVAL_SAMPLES} test_samples=${TEST_SAMPLES}"
 echo "[lara_clean_s100] stage2_reasoning_alignment=${STAGE2_REASONING_ALIGNMENT_MODE} field_slots=${REASONING_FIELD_SLOT_COUNTS}"
 if [[ -n "${STAGE1_REUSE_ADAPTER}" ]]; then
@@ -174,7 +179,7 @@ if [[ "${RUN_DDP_SMOKE}" == "1" ]]; then
       --epochs 1 \
       --max-samples 2 \
       --batch-size "${STAGE1_BATCH_SIZE}" \
-      --grad-accum-steps 1 \
+      --grad-accum-steps "${STAGE1_GRAD_ACCUM_STEPS}" \
       --lr 5e-5 \
       --lr-scheduler constant \
       --training-stage stage1 \
@@ -228,7 +233,7 @@ else
       --best-checkpoint-out "${STAGE1_BEST}" \
       --epochs "${STAGE1_MAX_EPOCHS}" \
       --batch-size "${STAGE1_BATCH_SIZE}" \
-      --grad-accum-steps 1 \
+      --grad-accum-steps "${STAGE1_GRAD_ACCUM_STEPS}" \
       --lr 5e-5 \
       --lr-scheduler constant \
       --training-stage stage1 \
@@ -273,7 +278,7 @@ if [[ ! -f "${STAGE2_TRANSITION_DIR}/done" ]] || ! artifacts_ready "${STAGE2_TRA
     --checkpoint-out "${STAGE2_TRANSITION_CKPT}" \
     --epochs "${STAGE2_TRANSITION_EPOCHS}" \
     --batch-size "${STAGE2_BATCH_SIZE}" \
-    --grad-accum-steps 1 \
+    --grad-accum-steps "${STAGE2_GRAD_ACCUM_STEPS}" \
     --lr 3e-5 \
     --lr-scheduler constant \
     --training-stage stage2 \
@@ -320,7 +325,7 @@ if [[ ! -f "${STAGE2_FULL_DIR}/done" ]] || ! artifacts_ready "${STAGE2_FULL_FINA
     --best-checkpoint-out "${STAGE2_FULL_BEST}" \
     --epochs "${STAGE2_FULL_MAX_EPOCHS}" \
     --batch-size "${STAGE2_BATCH_SIZE}" \
-    --grad-accum-steps 1 \
+    --grad-accum-steps "${STAGE2_GRAD_ACCUM_STEPS}" \
     --lr 3e-5 \
     --lr-scheduler constant \
     --training-stage stage2 \
@@ -371,7 +376,7 @@ if [[ ! -f "${ACTION_DIR}/done" ]] || ! artifacts_ready "${ACTION_FINAL}" "${ACT
     --best-checkpoint-out "${ACTION_BEST}" \
     --epochs "${ACTION_MAX_EPOCHS}" \
     --batch-size "${ACTION_BATCH_SIZE}" \
-    --grad-accum-steps 1 \
+    --grad-accum-steps "${ACTION_GRAD_ACCUM_STEPS}" \
     --lr 1e-4 \
     --lr-scheduler constant \
     --training-stage stage2 \

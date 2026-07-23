@@ -71,9 +71,17 @@ export TRAIN_EVAL_SAMPLES="${TRAIN_EVAL_SAMPLES:-200}"
 export TRAIN_WORLD_SIZE=2
 export TRAIN_DEVICE_MAP=none
 export EVAL_DEVICE_MAP="${EVAL_DEVICE_MAP:-balanced}"
-export STAGE1_BATCH_SIZE="${STAGE1_BATCH_SIZE:-4}"
-export STAGE2_BATCH_SIZE="${STAGE2_BATCH_SIZE:-4}"
-export ACTION_BATCH_SIZE="${ACTION_BATCH_SIZE:-4}"
+export PYTORCH_CUDA_ALLOC_CONF="${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
+# PPU eager attention can exceed 96 GiB even for two long five-frame samples
+# when the VLM requires gradients. Use one sample per rank for Stage 1/2 and
+# accumulate four micro-batches to preserve effective global batch 8. The
+# frozen-backbone action stage safely keeps two samples per rank.
+export STAGE1_BATCH_SIZE="${STAGE1_BATCH_SIZE:-1}"
+export STAGE2_BATCH_SIZE="${STAGE2_BATCH_SIZE:-1}"
+export ACTION_BATCH_SIZE="${ACTION_BATCH_SIZE:-2}"
+export STAGE1_GRAD_ACCUM_STEPS="${STAGE1_GRAD_ACCUM_STEPS:-4}"
+export STAGE2_GRAD_ACCUM_STEPS="${STAGE2_GRAD_ACCUM_STEPS:-4}"
+export ACTION_GRAD_ACCUM_STEPS="${ACTION_GRAD_ACCUM_STEPS:-2}"
 export STAGE1_MAX_EPOCHS="${STAGE1_MAX_EPOCHS:-12}"
 export STAGE2_TRANSITION_EPOCHS="${STAGE2_TRANSITION_EPOCHS:-4}"
 export STAGE2_FULL_MAX_EPOCHS="${STAGE2_FULL_MAX_EPOCHS:-12}"
